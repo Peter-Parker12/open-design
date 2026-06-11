@@ -9,6 +9,7 @@ ARG http_proxy
 ARG https_proxy
 ARG no_proxy
 ARG NO_PROXY
+ARG NEXT_PUBLIC_OD_CLERK_PUBLISHABLE_KEY
 
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTPS_PROXY}
@@ -17,6 +18,10 @@ ENV https_proxy=${https_proxy}
 ENV no_proxy=${no_proxy}
 ENV NO_PROXY=${NO_PROXY}
 ENV CI=true
+# Baked into the static export at build time (apps/web's output: 'export'
+# has no server runtime to read this later). Optional: when unset,
+# apps/web/src/auth/ClerkGate renders children unchanged.
+ENV NEXT_PUBLIC_OD_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_OD_CLERK_PUBLISHABLE_KEY}
 
 RUN apk add --no-cache python3 make g++
 

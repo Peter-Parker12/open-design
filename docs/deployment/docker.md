@@ -63,6 +63,20 @@ You should see the Open Design interface.
 ![Open Design home (desktop)](../screenshots/deployment/docker/01-open-design-home.png)
 ![Open Design home (mobile)](../screenshots/deployment/docker/03-open-design-mobile.png)
 
+## Optional: Add a Login Wall (Clerk)
+
+By default, anyone who can reach the published port can use the app. To
+require sign-in for browser access (recommended for a public domain), set
+`OPEN_DESIGN_CLERK_PUBLISHABLE_KEY` and `OPEN_DESIGN_CLERK_SECRET_KEY` in `.env`
+from a [Clerk](https://dashboard.clerk.com) application, then rebuild:
+
+```bash
+docker compose up -d --build
+```
+
+See [deploy/README.md](../../deploy/README.md#optional-clerk-login-wall) for
+details. Leave both keys empty to skip this.
+
 ## Common Issues
 
 - `failed to connect to the docker API`: Docker Desktop is not running yet

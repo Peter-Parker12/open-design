@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { I18nProvider } from '../src/i18n';
 import { AnalyticsProvider } from '../src/analytics/provider';
+import { ClerkGate } from '../src/auth/ClerkGate';
 import '../src/index.css';
 import '../src/styles/home/index.css';
 
@@ -37,7 +38,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body suppressHydrationWarning>
         <I18nProvider>
-          <AnalyticsProvider>{children}</AnalyticsProvider>
+          <ClerkGate>
+            <AnalyticsProvider>{children}</AnalyticsProvider>
+          </ClerkGate>
         </I18nProvider>
       </body>
     </html>

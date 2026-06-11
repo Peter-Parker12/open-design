@@ -519,6 +519,7 @@ import {
   isAllowedBrowserOrigin,
   isLocalSameOrigin,
 } from './origin-validation.js';
+import { isClerkAuthConfigured, verifyClerkBearerToken } from './clerk-auth.js';
 
 /** @typedef {import('@open-design/contracts').ApiErrorCode} ApiErrorCode */
 /** @typedef {import('@open-design/contracts').ApiError} ApiError */
@@ -4672,12 +4673,19 @@ export async function startServer({
   // purely additive: when present, every /api/* request must carry a
   // matching `Authorization: Bearer <token>` header (loopback origins
   // are exempted so the desktop UI keeps working).
+  //
+  // OD_CLERK_SECRET_KEY / OD_CLERK_PUBLISHABLE_KEY are an alternative to
+  // OD_API_TOKEN for this safety floor: apps/web gates the SPA behind
+  // Clerk sign-in and attaches the signed-in user's session token to
+  // /api/* requests, which verifyClerkBearerToken validates below.
   const apiToken = (process.env.OD_API_TOKEN ?? '').trim();
-  if (!isLoopbackHostname(host) && apiToken.length === 0) {
+  const clerkConfigured = isClerkAuthConfigured();
+  const clerkSecretKey = (process.env.OD_CLERK_SECRET_KEY ?? '').trim();
+  if (!isLoopbackHostname(host) && apiToken.length === 0 && !clerkConfigured) {
     throw new Error(
-      `OD_BIND_HOST=${host} requires OD_API_TOKEN to be set. ` +
-      `Generate one with \`openssl rand -hex 32\` and re-launch. ` +
-      `(Loopback hosts 127.0.0.1 / ::1 / localhost do not need a token.)`,
+      `OD_BIND_HOST=${host} requires OD_API_TOKEN or OD_CLERK_SECRET_KEY/OD_CLERK_PUBLISHABLE_KEY to be set. ` +
+      `Generate an OD_API_TOKEN with \`openssl rand -hex 32\`, or configure Clerk, and re-launch. ` +
+      `(Loopback hosts 127.0.0.1 / ::1 / localhost do not need either.)`,
     );
   }
 
@@ -4688,16 +4696,16 @@ export async function startServer({
 
   // Plan §3.K1 — bearer-token middleware.
   //
-  // Active only when OD_API_TOKEN is set. Loopback origins skip the
-  // check (the desktop UI / local CLI never carry a bearer); every
-  // other request must present `Authorization: Bearer <token>` with a
-  // value matching `OD_API_TOKEN`. Health / readiness / version remain
-  // open so monitoring probes don't need the token. Server-minted
-  // project preview asset scopes are also accepted for GETs so sandboxed
-  // browser iframes can load HTML/CSS/JS without privileged headers.
-  // Rich daemon status stays authenticated because it includes local
-  // runtime paths.
-  if (apiToken.length > 0) {
+  // Active when OD_API_TOKEN and/or Clerk are configured. Loopback origins
+  // skip the check (the desktop UI / local CLI never carry a bearer); every
+  // other request must present `Authorization: Bearer <token>` matching
+  // either OD_API_TOKEN or a valid Clerk session token. Health / readiness /
+  // version remain open so monitoring probes don't need the token.
+  // Server-minted project preview asset scopes are also accepted for GETs
+  // so sandboxed browser iframes can load HTML/CSS/JS without privileged
+  // headers. Rich daemon status stays authenticated because it includes
+  // local runtime paths.
+  if (apiToken.length > 0 || clerkConfigured) {
     const openProbePaths = new Set([
       '/health',
       '/api/health',
@@ -4706,7 +4714,7 @@ export async function startServer({
       '/version',
       '/api/version',
     ]);
-    app.use('/api', (req, res, next) => {
+    app.use('/api', async (req, res, next) => {
       if (openProbePaths.has(req.path)) return next();
       if (req.method === 'GET') {
         const previewAsset = parseProjectPreviewAssetPath(req.path);
@@ -4724,12 +4732,21 @@ export async function startServer({
       if (isLoopbackPeerAddress(req.socket?.remoteAddress)) return next();
       const auth = req.get('authorization') ?? '';
       const match = /^Bearer\s+(\S+)\s*$/i.exec(auth);
-      if (!match || match[1] !== apiToken) {
-        return res.status(401).json({
-          error: { code: 'API_TOKEN_REQUIRED', message: 'Authorization: Bearer <OD_API_TOKEN> required' },
-        });
+      const token = match?.[1];
+      if (token) {
+        if (apiToken.length > 0 && token === apiToken) return next();
+        if (clerkConfigured && (await verifyClerkBearerToken(token, clerkSecretKey))) {
+          return next();
+        }
       }
-      return next();
+      return res.status(401).json({
+        error: {
+          code: clerkConfigured && apiToken.length === 0 ? 'AUTH_REQUIRED' : 'API_TOKEN_REQUIRED',
+          message: clerkConfigured
+            ? 'Sign in required, or pass Authorization: Bearer <OD_API_TOKEN>'
+            : 'Authorization: Bearer <OD_API_TOKEN> required',
+        },
+      });
     });
   }
 

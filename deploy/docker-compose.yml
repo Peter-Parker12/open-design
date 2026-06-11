@@ -7,6 +7,8 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
+      args:
+        NEXT_PUBLIC_OD_CLERK_PUBLISHABLE_KEY: ${OPEN_DESIGN_CLERK_PUBLISHABLE_KEY:-}
     restart: always
     environment:
       NODE_ENV: production
@@ -16,6 +18,8 @@ services:
       OD_PORT: 7456
       OD_WEB_PORT: ${OPEN_DESIGN_PORT:-7456}
       OD_API_TOKEN: ${OD_API_TOKEN:?Please run 'openssl rand -hex 32' to generate one, and set it in your .env file.}
+      OD_CLERK_SECRET_KEY: ${OPEN_DESIGN_CLERK_SECRET_KEY:-}
+      OD_CLERK_PUBLISHABLE_KEY: ${OPEN_DESIGN_CLERK_PUBLISHABLE_KEY:-}
       OD_CODEX_SANDBOX: ${OD_CODEX_SANDBOX:-}
     ports:
       - "127.0.0.1:${OPEN_DESIGN_PORT:-7456}:7456"

@@ -49,6 +49,31 @@ allowed to call `/api`:
 OPEN_DESIGN_ALLOWED_ORIGINS=https://od.example.com,http://203.0.113.10:7456 docker compose up -d --no-build
 ```
 
+### Optional: Clerk login wall
+
+By default, anyone who can reach the published port can use the app (the
+`OD_API_TOKEN` gate only covers non-browser `/api` clients). To require sign-in
+for browser access — useful when exposing the instance on a public domain —
+configure a [Clerk](https://dashboard.clerk.com) application and set both keys
+in `.env`:
+
+```bash
+OPEN_DESIGN_CLERK_PUBLISHABLE_KEY=pk_...
+OPEN_DESIGN_CLERK_SECRET_KEY=sk_...
+```
+
+`OPEN_DESIGN_CLERK_PUBLISHABLE_KEY` is baked into the static web build, so
+applying it (or changing it) requires a rebuild:
+
+```bash
+docker compose up -d --build
+```
+
+Once both keys are set, signed-out browsers see a Clerk sign-in screen instead
+of the app, and `/api` requests must carry a valid Clerk session token (in
+addition to the existing `OD_API_TOKEN` automation path). Leave both keys empty
+to disable — the app behaves exactly as before.
+
 Pin a specific published image with a digest instead of the mutable `latest` tag:
 
 ```bash
